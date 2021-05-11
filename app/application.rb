@@ -5,14 +5,27 @@ require 'json'
 
 # API
 class Application
-  def call(env)
-    resp = Rack::Response.new
-    req = Rack::Request.new env
+  def initialize
+    @response = nil
+    @request = nil
+  end
 
-    if req.path == '/crystals'
+  def call(env)
+    @response = Rack::Response.new
+    @request = Rack::Request.new env
+
+    if @request.path == '/crystals' && @request.get?
       index
-    elsif req.path.match(/crystals/) && req.path.split('/')[2]
-      show req
+    elsif @request.path.match(/crystals/) && @request.get?
+      show
+    elsif @request.path == '/crystals' && @request.post?
+      create
+    elsif @request.path.match(/crystals/) && @request.patch?
+      update
+    elsif @request.path.match(/crystals/) && @request.delete?
+      destroy
+    else
+      not_found
     end
   end
 
@@ -24,12 +37,44 @@ class Application
     ]
   end
 
-  def show(req)
-    req.params[:id] = req.path.split('/')[2]
+  def show
+    id = @request.path.split('/')[2]
     [
       200,
       { 'Content-Type' => 'application/json' },
-      [Crystal.find(req.params[:id]).to_json]
+      [Crystal.find(id).to_json]
     ]
+  end
+
+  def create
+    data = JSON.parse @request.body.read
+    new_crystal = Crystal.create(data)
+    [
+      201,
+      { 'Content-Type' => 'application/json' },
+      [new_crystal.to_json]
+    ]
+  end
+
+  def update
+    id = @request.path.split('/')[2]
+    crystal = Crystal.find(id)
+    data = JSON.parse @request.body.read
+    crystal.update(data)
+    [
+      200,
+      { 'Content-Type' => 'application/json' },
+      [crystal.to_json]
+    ]
+  end
+
+  def destroy
+    id = @request.path.split('/')[2]
+    Crystal.find(id).destroy
+    [204, {}, ['']]
+  end
+
+  def not_found
+    [404, {}, ['']]
   end
 end
