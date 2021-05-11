@@ -8,6 +8,8 @@ class Application
   def initialize
     @response = nil
     @request = nil
+    @crystal = nil
+    @error = nil
   end
 
   def call(env)
@@ -25,7 +27,7 @@ class Application
     elsif @request.path.match(/crystals/) && @request.delete?
       destroy
     else
-      not_found
+      route_not_found
     end
   end
 
@@ -38,11 +40,12 @@ class Application
   end
 
   def show
-    id = @request.path.split('/')[2]
+    return id_not_found if find_crystal && @error.present?
+
     [
       200,
       { 'Content-Type' => 'application/json' },
-      [Crystal.find(id).to_json]
+      [@crystal.to_json]
     ]
   end
 
@@ -57,24 +60,40 @@ class Application
   end
 
   def update
-    id = @request.path.split('/')[2]
-    crystal = Crystal.find(id)
+    return id_not_found if find_crystal && @error.present?
+
     data = JSON.parse @request.body.read
-    crystal.update(data)
+    @crystal.update(data)
     [
       200,
       { 'Content-Type' => 'application/json' },
-      [crystal.to_json]
+      [@crystal.to_json]
     ]
   end
 
   def destroy
-    id = @request.path.split('/')[2]
-    Crystal.find(id).destroy
+    return id_not_found if find_crystal && @error.present?
+
+    @crystal.destroy
     [204, {}, ['']]
   end
 
-  def not_found
+  def route_not_found
     [404, {}, ['']]
+  end
+
+  def id_not_found
+    [
+      404,
+      { 'Content-Type' => 'application/json' },
+      [{ error: @error.message }.to_json]
+    ]
+  end
+
+  def find_crystal
+    id = @request.path.split('/')[2]
+    @crystal = Crystal.find(id)
+  rescue ActiveRecord::RecordNotFound => e
+    @error = e
   end
 end
